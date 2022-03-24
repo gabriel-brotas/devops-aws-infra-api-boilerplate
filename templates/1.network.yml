@@ -1,0 +1,198 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 1 VPC, 2 Subnets Public and 2 Private, 1 IGW, 2 NAT and 4 Route Table
+Parameters:
+  ProjectName:
+    Type: String
+    Default: api-boilerplate
+
+Mappings:
+  SubnetConfig:
+    VPC:
+      CIDR: '10.10.0.0/16'
+    PublicSubnetOne:
+      CIDR: '10.10.0.0/24'
+    PublicSubnetTwo:
+      CIDR: '10.10.1.0/24'
+    PrivateSubnetOne:
+      CIDR: '10.10.2.0/24'
+    PrivateSubnetTwo:
+      CIDR: '10.10.3.0/24'
+
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      CidrBlock: !FindInMap ['SubnetConfig', 'VPC', 'CIDR'] # get the CIDR value from Mappings.SubnetConfig.VPC.CIDR
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-vpc
+
+  PublicSubnetOne:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:
+         Fn::Select:
+         - 0
+         - Fn::GetAZs: {Ref: 'AWS::Region'}
+      VpcId: !Ref 'VPC'
+      CidrBlock: !FindInMap ['SubnetConfig', 'PublicSubnetOne', 'CIDR']
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name 
+          Value: !Sub ${ProjectName}-subnet-public-1a
+
+  PublicSubnetTwo:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:
+         Fn::Select:
+         - 1
+         - Fn::GetAZs: {Ref: 'AWS::Region'}
+      VpcId: !Ref 'VPC'
+      CidrBlock: !FindInMap ['SubnetConfig', 'PublicSubnetTwo', 'CIDR']
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name 
+          Value: !Sub ${ProjectName}-subnet-public-1b
+  
+  PrivateSubnetOne:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:
+         Fn::Select:
+         - 0
+         - Fn::GetAZs: {Ref: 'AWS::Region'}
+      VpcId: !Ref 'VPC'
+      CidrBlock: !FindInMap ['SubnetConfig', 'PrivateSubnetOne', 'CIDR']
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name 
+          Value: !Sub ${ProjectName}-subnet-private-1a
+
+  PrivateSubnetTwo:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:
+         Fn::Select:
+         - 1
+         - Fn::GetAZs: {Ref: 'AWS::Region'}
+      VpcId: !Ref 'VPC'
+      CidrBlock: !FindInMap ['SubnetConfig', 'PrivateSubnetTwo', 'CIDR']
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name 
+          Value: !Sub ${ProjectName}-subnet-private-1b
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-igw
+
+  GatewayAttachement:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref 'VPC'
+      InternetGatewayId: !Ref 'InternetGateway'
+
+  PublicRouteTableOne:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref 'VPC'
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-rtb-public-1a
+  
+  PublicRouteTableTwo:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref 'VPC'
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-rtb-public-1b
+  
+  PrivateRouteTableOne:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref 'VPC'
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-rtb-private-1a
+  
+  PrivateRouteTableTwo:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref 'VPC'
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-rtb-private-1b
+
+  PublicRouteTableOneGatewayAttachement:
+    Type: AWS::EC2::Route
+    DependsOn: GatewayAttachement
+    Properties:
+      RouteTableId: !Ref 'PublicRouteTableOne'
+      DestinationCidrBlock: '0.0.0.0/0'
+      GatewayId: !Ref 'InternetGateway'
+
+  PublicRouteTableTwoGatewayAttachement:
+    Type: AWS::EC2::Route
+    DependsOn: GatewayAttachement
+    Properties:
+      RouteTableId: !Ref 'PublicRouteTableTwo'
+      DestinationCidrBlock: '0.0.0.0/0'
+      GatewayId: !Ref 'InternetGateway'
+
+  PublicRouteTableOneAssociationWithPublicSubnetOne:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetOne
+      RouteTableId: !Ref PublicRouteTableOne
+
+  PublicRouteTableTwoAssociationWithPublicSubnetTwo:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetTwo
+      RouteTableId: !Ref PublicRouteTableTwo
+
+  PrivateRouteTableOneAssociationWithPrivateSubnetOne:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnetOne
+      RouteTableId: !Ref PrivateRouteTableOne
+
+  PrivateRouteTableTwoAssociationWithPrivateSubnetTwo:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnetTwo
+      RouteTableId: !Ref PrivateRouteTableTwo
+
+Outputs:
+  VpcId:
+    Description: The ID of the VPC that this stack is deployed in
+    Value: !Ref 'VPC'
+    Export:
+      Name: !Sub ${ProjectName}:VpcId
+  PublicSubnetOne:
+    Description: Public subnet one
+    Value: !Ref 'PublicSubnetOne'
+    Export:
+      Name: !Sub ${ProjectName}:PublicSubnetOne
+  PublicSubnetTwo:
+    Description: Public subnet two
+    Value: !Ref 'PublicSubnetTwo'
+    Export:
+      Name: !Sub ${ProjectName}:PublicSubnetTwo
+  PrivateSubnetOne:
+    Description: Public subnet two
+    Value: !Ref 'PrivateSubnetOne'
+    Export:
+      Name: !Sub ${ProjectName}:PrivateSubnetOne
+  PrivateSubnetTwo:
+    Description: Public subnet two
+    Value: !Ref 'PrivateSubnetTwo'
+    Export:
+      Name: !Sub ${ProjectName}:PrivateSubnetTwo
