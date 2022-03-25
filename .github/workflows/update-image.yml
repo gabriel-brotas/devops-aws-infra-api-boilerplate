@@ -1,4 +1,4 @@
-name: Update Infra
+name: Update Task Definition Image
 
 on:
   push:
@@ -12,6 +12,12 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
+      - name: Use Node.js 16.x
+        uses: actions/setup-node@v2
+        with:
+          node-version: 16.x
+          cache: 'npm'
+
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
@@ -23,5 +29,5 @@ jobs:
         run: |
           cd scripts
           chmod +x ./*.sh
-          ./update-infra.sh
+          ./deploy-image.sh
 
