@@ -1,0 +1,95 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: ECS cluster launchtype Fargate.
+Parameters:
+  ProjectName:
+    Type: String
+    Default: api-boilerplate
+
+  S3BucketName:
+    Type: String
+    Default: api-boilerplate-cloudformation-templates
+
+  VpcId:
+    Type: String
+    Description: VPC From network stack
+  
+  ECSTaskExecutionRole:
+    Type: String
+    Description: Role from roles stack
+
+Resources:    
+  ECSCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub ${ProjectName}-cluster-fargate
+  
+  ContainerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Access to the ECS hosts that run containers
+      VpcId: !Sub ${VpcId}
+
+  ECRRepository:
+    Type: AWS::ECR::Repository
+    Properties: 
+      RepositoryName: !Sub ${ProjectName}-ecr-repository
+      ImageScanningConfiguration: 
+        ScanOnPush: false        
+      ImageTagMutability: MUTABLE
+      RepositoryPolicyText: 
+        Version: "2012-10-17"
+        Statement: 
+            Sid: AllowPushPull
+            Effect: Allow
+            Principal: 
+              AWS: 
+                - "arn:aws:iam::778568866635:user/gbrotas22-admin"
+            Action: 
+              - "ecr:GetDownloadUrlForLayer"
+              - "ecr:BatchGetImage"
+              - "ecr:BatchCheckLayerAvailability"
+              - "ecr:PutImage"
+              - "ecr:InitiateLayerUpload"
+              - "ecr:UploadLayerPart"
+              - "ecr:CompleteLayerUpload"
+
+  APITaskDefinition: 
+    Type: AWS::ECS::TaskDefinition
+    Properties: 
+      ContainerDefinitions: 
+        - 
+          Name: my-api
+          Image: !Ref ECRRepository
+          PortMappings: 
+            - 
+              ContainerPort: 4000
+              HostPort: 4000
+          Essential: true
+      NetworkMode: awsvpc
+      Cpu: 256
+      Memory: 512
+      ExecutionRoleArn: !Sub ${ECSTaskExecutionRole}
+      TaskRoleArn: !Sub ${ECSTaskExecutionRole}
+      RequiresCompatibilities:
+        - FARGATE
+      RuntimePlatform:
+        OperatingSystemFamily: LINUX
+
+Outputs:
+  ClusterName:
+    Description: The name of the ECS cluster
+    Value: !Ref 'ECSCluster'
+  
+  APITaskDefinition:
+    Description: The ARN of the task definition
+    Value: !Ref 'APITaskDefinition'
+    Export:
+      Name: !Sub ${ProjectName}:APITaskDefinition
+  
+  ECRRepository:
+    Description: The ARN of the ECR repository
+    Value: !Ref 'ECRRepository'
+    Export:
+      Name: !Sub ${ProjectName}:ECRRepository
+    
+  

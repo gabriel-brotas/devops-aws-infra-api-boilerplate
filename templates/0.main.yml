@@ -1,0 +1,42 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: create IAM roles for ECS usage upfront
+
+Parameters:
+  S3BucketName:
+    Type: String
+    Default: api-boilerplate-cloudformation-templates
+
+Resources:
+  StackCreateNetwork:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub https://${S3BucketName}.s3.amazonaws.com/2.network.yml
+
+  StackCreateRoles:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub https://${S3BucketName}.s3.amazonaws.com/1.roles.yml
+
+  StackCreateEcsAndEcr:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub https://${S3BucketName}.s3.amazonaws.com/3.ecs-and-ecr.yml
+      Parameters:
+        VpcId: 
+          Fn::GetAtt: 
+          - StackCreateNetwork
+          - Outputs.VpcId
+        ECSTaskExecutionRole:
+          Fn::GetAtt: 
+          - StackCreateRoles
+          - Outputs.ECSTaskExecutionRole
+
+  StackCreateALB:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub https://${S3BucketName}.s3.amazonaws.com/3.ecs-and-ecr.yml
+      Parameters:
+        VpcId: 
+          Fn::GetAtt: 
+          - StackCreateNetwork
+          - Outputs.VpcId
