@@ -1,0 +1,218 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: ECS cluster launchtype Fargate. ECR, Tark Definition and public facing load balancer, for forwarding public traffic to containers
+Parameters:
+  ProjectName:
+    Type: String
+    Default: api-boilerplate
+
+  S3BucketName:
+    Type: String
+    Default: api-boilerplate-cloudformation-templates
+
+  VpcId:
+    Type: String
+    Description: VPC From network stack
+  
+  ECSTaskExecutionRole:
+    Type: String
+    Description: Role from roles stack
+
+  PublicSubnetOne:
+    Type: String
+    Description: Public subnet one 
+
+  PublicSubnetTwo:
+    Type: String
+    Description: Public subnet two
+  
+Resources:    
+  ECSCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub ${ProjectName}-cluster-fargate
+  
+  ContainerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Access to the ECS hosts that run containers
+      VpcId: !Sub ${VpcId}
+
+  ECRRepository:
+    Type: AWS::ECR::Repository
+    Properties: 
+      RepositoryName: !Sub ${ProjectName}-ecr-repository
+      ImageScanningConfiguration: 
+        ScanOnPush: false        
+      ImageTagMutability: MUTABLE
+      RepositoryPolicyText: 
+        Version: "2012-10-17"
+        Statement: 
+            Sid: AllowPushPull
+            Effect: Allow
+            Principal: 
+              AWS: 
+                - "arn:aws:iam::778568866635:user/gbrotas22-admin"
+            Action: 
+              - "ecr:GetDownloadUrlForLayer"
+              - "ecr:BatchGetImage"
+              - "ecr:BatchCheckLayerAvailability"
+              - "ecr:PutImage"
+              - "ecr:InitiateLayerUpload"
+              - "ecr:UploadLayerPart"
+              - "ecr:CompleteLayerUpload"
+
+  APITaskDefinition: 
+    Type: AWS::ECS::TaskDefinition
+    Properties: 
+      ContainerDefinitions: 
+        - 
+          Name: my-api
+          Image: !Ref ECRRepository
+          PortMappings: 
+            - 
+              ContainerPort: 4000
+              HostPort: 4000
+          Essential: true
+      NetworkMode: awsvpc
+      Cpu: 256
+      Memory: 512
+      ExecutionRoleArn: !Sub ${ECSTaskExecutionRole}
+      TaskRoleArn: !Sub ${ECSTaskExecutionRole}
+      RequiresCompatibilities:
+        - FARGATE
+      RuntimePlatform:
+        OperatingSystemFamily: LINUX
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-api-task-definition
+
+  SecurityGroupToPublicLoadBalancer:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Access to the public facing load balancer
+      VpcId: !Sub ${VpcId}
+      SecurityGroupIngress:
+          - CidrIp: 0.0.0.0/0 # allow every access from anywhere
+            IpProtocol: tcp
+            FromPort: 80
+            ToPort: 80
+
+      SecurityGroupEgress:
+          - CidrIp: 0.0.0.0/0 
+            IpProtocol: -1  # -1 means all protocols 
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-sg-public-load-balancer
+
+  PublicApplicationLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Scheme: internet-facing
+      LoadBalancerAttributes:
+      - Key: idle_timeout.timeout_seconds
+        Value: '30'
+      Subnets:
+        - !Sub ${PublicSubnetOne}
+        - !Sub ${PublicSubnetTwo}
+      SecurityGroups: [!Ref 'SecurityGroupToPublicLoadBalancer']
+      Name: !Sub ${ProjectName}-public-alb-ecs
+  
+  TargetGroupFargateService:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 6
+      HealthCheckPath: /health-check
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      Port: 80
+      Protocol: HTTP
+      TargetType: ip # network mode aws-vpc
+      UnhealthyThresholdCount: 2
+      Name: !Sub ${ProjectName}-tg-fargate
+      VpcId: !Sub ${VpcId}
+
+  PublicLoadBalancerListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    DependsOn:
+      - PublicApplicationLoadBalancer
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref 'TargetGroupFargateService'
+      LoadBalancerArn: !Ref 'PublicApplicationLoadBalancer'
+      Port: 80
+      Protocol: HTTP
+
+  SecurityGroupToClusterService:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Access from alb to ecs
+      VpcId: !Sub ${VpcId}
+      SecurityGroupIngress:
+        - SourceSecurityGroupId: !Ref 'SecurityGroupToPublicLoadBalancer'
+          IpProtocol: tcp
+          FromPort: 4000
+          ToPort: 4000
+      SecurityGroupEgress:
+          - CidrIp: 0.0.0.0/0 
+            IpProtocol: -1  # -1 means all protocols 
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-sg-public-load-balancer
+
+  # ClusterService:
+  #   Type: AWS::ECS::Service
+  #   DependsOn:
+  #     - ECSCluster
+  #     - APITaskDefinition
+  #     - PublicApplicationLoadBalancer
+  #     - TargetGroupFargateService
+  #   Properties:
+  #     LaunchType: FARGATE
+  #     PlatformVersion: LATEST
+  #     TaskDefinition: !Ref APITaskDefinition
+  #     ServiceName: !Sub ${ProjectName}-api-service
+  #     Cluster: !Ref ECSCluster
+  #     DesiredCount: 1
+  #     DeploymentConfiguration:
+  #       MaximumPercent: 200
+  #       MinimumHealthyPercent: 100
+  #     NetworkConfiguration:
+  #       AwsvpcConfiguration:
+  #         Subnets:
+  #           - !Sub ${PublicSubnetOne}
+  #           - !Sub ${PublicSubnetTwo}
+  #         SecurityGroups:
+  #           - !Ref SecurityGroupToPublicLoadBalancer
+  #         AssignPublicIp: 'ENABLED'      
+  #     LoadBalancers:
+  #       - LoadBalancerName: !Ref 'PublicApplicationLoadBalancer'
+  #         ContainerName: my-api
+  #         ContainerPort: 4000
+  #         TargetGroupArn: !Ref 'TargetGroupFargateService'
+
+Outputs:
+  ClusterName:
+    Description: The name of the ECS cluster
+    Value: !Ref 'ECSCluster'
+  
+  APITaskDefinition:
+    Description: The ARN of the task definition
+    Value: !Ref 'APITaskDefinition'
+    Export:
+      Name: !Sub ${ProjectName}:APITaskDefinition
+  
+  ECRRepository:
+    Description: The ARN of the ECR repository
+    Value: !Ref 'ECRRepository'
+    Export:
+      Name: !Sub ${ProjectName}:ECRRepository
+    
+  ExternalUrl:
+    Description: The url of the external load balancer
+    Value: !Sub http://${PublicApplicationLoadBalancer.DNSName}
+    Export:
+      Name: !Sub ${ProjectName}:ExternalUrl
+    
+  

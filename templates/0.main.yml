@@ -17,10 +17,10 @@ Resources:
     Properties:
       TemplateURL: !Sub https://${S3BucketName}.s3.amazonaws.com/1.roles.yml
 
-  StackCreateEcsAndEcr:
+  StackCreateEcsAndAlb:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Sub https://${S3BucketName}.s3.amazonaws.com/3.ecs-and-ecr.yml
+      TemplateURL: !Sub https://${S3BucketName}.s3.amazonaws.com/3.ecs-and-alb.yml
       Parameters:
         VpcId: 
           Fn::GetAtt: 
@@ -31,12 +31,12 @@ Resources:
           - StackCreateRoles
           - Outputs.ECSTaskExecutionRole
 
-  StackCreateALB:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: !Sub https://${S3BucketName}.s3.amazonaws.com/3.ecs-and-ecr.yml
-      Parameters:
-        VpcId: 
+        PublicSubnetOne:
           Fn::GetAtt: 
           - StackCreateNetwork
-          - Outputs.VpcId
+          - Outputs.PublicSubnetOne
+          
+        PublicSubnetTwo:
+          Fn::GetAtt: 
+          - StackCreateNetwork
+          - Outputs.PublicSubnetTwo

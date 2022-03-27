@@ -23,5 +23,5 @@ jobs:
         run: |
           cd scripts
           chmod +x ./*.sh
-          ./update-infra.sh
+          ./1.update-infra.sh
 

@@ -25,9 +25,15 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
 
-      - name: Exec Update Script
+      - name: Update ECR Image
         run: |
           cd scripts
           chmod +x ./*.sh
-          ./deploy-image.sh
+          ./2.deploy-image.sh
+
+      # - name: Update Task Definition
+      #   run: |
+      #     cd scripts
+      #     chmod +x ./*.sh
+      #     ./3.update-task-definition.sh
 
