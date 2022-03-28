@@ -117,7 +117,7 @@ Resources:
       SecurityGroups: [!Ref 'SecurityGroupToPublicLoadBalancer']
       Name: !Sub ${ProjectName}-public-alb-ecs
   
-  TargetGroupFargateService:
+  ALBTargetGroupFargateService:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
       HealthCheckIntervalSeconds: 6
@@ -139,7 +139,7 @@ Resources:
     Properties:
       DefaultActions:
         - Type: forward
-          TargetGroupArn: !Ref 'TargetGroupFargateService'
+          TargetGroupArn: !Ref 'ALBTargetGroupFargateService'
       LoadBalancerArn: !Ref 'PublicApplicationLoadBalancer'
       Port: 80
       Protocol: HTTP
@@ -159,7 +159,7 @@ Resources:
             IpProtocol: -1  # -1 means all protocols 
       Tags:
         - Key: Name
-          Value: !Sub ${ProjectName}-sg-public-load-balancer
+          Value: !Sub ${ProjectName}-sg-service-to-alb
 
   # ClusterService:
   #   Type: AWS::ECS::Service
@@ -167,7 +167,7 @@ Resources:
   #     - ECSCluster
   #     - APITaskDefinition
   #     - PublicApplicationLoadBalancer
-  #     - TargetGroupFargateService
+  #     - ALBTargetGroupFargateService
   #   Properties:
   #     LaunchType: FARGATE
   #     PlatformVersion: LATEST
@@ -184,13 +184,13 @@ Resources:
   #           - !Sub ${PublicSubnetOne}
   #           - !Sub ${PublicSubnetTwo}
   #         SecurityGroups:
-  #           - !Ref SecurityGroupToPublicLoadBalancer
-  #         AssignPublicIp: 'ENABLED'      
+  #           - !Ref SecurityGroupToClusterService
+  #         AssignPublicIp: 'ENABLED'    
   #     LoadBalancers:
-  #       - LoadBalancerName: !Ref 'PublicApplicationLoadBalancer'
+  #       # - LoadBalancerName: !Ref 'PublicApplicationLoadBalancer'
+  #       - TargetGroupArn: !Ref 'ALBTargetGroupFargateService'
   #         ContainerName: my-api
   #         ContainerPort: 4000
-  #         TargetGroupArn: !Ref 'TargetGroupFargateService'
 
 Outputs:
   ClusterName:

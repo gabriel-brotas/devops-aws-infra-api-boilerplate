@@ -9,7 +9,8 @@
 - [X] Script to update ecr image
 - [ ] IaC -> Create Cluster Service pointing to task definition
 - [ ] IaC -> Attach Service To Load Balancer Target Group
-- [ ] IaC CI/CD -> deploy templates in a s3 bucket and update the infrastructure
+- [X] IaC CI/CD -> deploy templates in a s3 bucket and update the infrastructure
+
 ## Concepts
 - Cloudformation
 - Nested stack
