@@ -1,4 +1,4 @@
-name: Update Task Definition Image
+name: Update API
 
 on:
   push:
@@ -25,15 +25,9 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
 
-      - name: Update ECR Image
+      - name: Update API
         run: |
           cd scripts
           chmod +x ./*.sh
-          ./2.deploy-image.sh
-
-      # - name: Update Task Definition
-      #   run: |
-      #     cd scripts
-      #     chmod +x ./*.sh
-      #     ./3.update-task-definition.sh
+          ./2.update-api.sh
 

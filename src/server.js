@@ -8,7 +8,7 @@ app.get('/health-check', (req, res) => {
 })
 
 app.get('/version', (req, res) => {
-    return res.status(200).json({ success: true, version: '1.0.0' })
+    return res.status(200).json({ success: true, version: '1.2.0' })
 })
 
 app.get('/', (req, res) => {
